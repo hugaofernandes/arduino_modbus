@@ -54,7 +54,6 @@ int bomba3 = 7;
 int sensor1 = 8;
 int sensor2 = 9;
 int sensor3 = 10;
-int sensorInit = sensor1; /* sensorInit é inicializada com sensor1 como condição de Start do Sistema. O reservatório 1 desse começar cheio. */
 unsigned long millisAnterior = 0;
 
 int ligarBomba(int bomba) {
@@ -72,11 +71,10 @@ int verificacaoDeNivel(int sensor) {
   while (digitalRead(sensor)) {
     media++;
     if (media <= 3) {
-      return 1; /* nivel alto (Reservatorio cheio) */
+      return 0; /* nivel baixo (Reservatorio vazio) */
     }
-    update_mb_slave(MB_SLAVE, regs, MB_REGS);
   }
-  return 0; /* nivel baixo (Reservatorio baixo) */
+  return 1; /* nivel alto (Reservatorio cheio) */
 }
 
 int tempoDeExecucao(unsigned long tempo) {
@@ -117,123 +115,62 @@ void automatizar(int sensorRegs, int sensor, int bombaRegs, int bomba) {
     regs[sensorRegs] = verificacaoDeNivel(sensor);
     update_mb_slave(MB_SLAVE, regs, MB_REGS);
     millisAnterior = millis();
-    while ((sensorInit == sensor) and regs[modoOperacao] and !regs[sensorRegs] and tempoDeExecucao(millisAnterior)) {
+    while (regs[modoOperacao] and !regs[sensorRegs] and tempoDeExecucao(millisAnterior)) {
          regs[bombaRegs] = ligarBomba(bomba);
          regs[sensorRegs] = verificacaoDeNivel(sensor);
          update_mb_slave(MB_SLAVE, regs, MB_REGS);
     }
-    sensorInit++;
+    regs[bombaRegs] = desligarBomba(bomba);
+    update_mb_slave(MB_SLAVE, regs, MB_REGS);
 }
 
-void manual(int sensorRegs, int sensor, int bombaRegs, int bomba) {
+void manual () {
     digitalWrite(ledPin13, regs[modoOperacao]);
-    regs[bomba1Regs] = desligarBomba(bomba1);
-    regs[bomba2Regs] = desligarBomba(bomba2);
-    regs[bomba3Regs] = desligarBomba(bomba3);
-    regs[sensorRegs] = verificacaoDeNivel(sensor);
-    update_mb_slave(MB_SLAVE, regs, MB_REGS);
-    millisAnterior = millis();
-    while (regs[bombaRegs] and !regs[sensorRegs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)) {
-         regs[bombaRegs] = ligarBomba(bomba);
-         regs[sensorRegs] = verificacaoDeNivel(sensor);
+    while (regs[bomba1Regs] and !regs[sensor2Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)){
+         regs[bomba1Regs] = ligarBomba(bomba1);
+         regs[bomba2Regs] = desligarBomba(bomba2);
+         regs[bomba3Regs] = desligarBomba(bomba3);
+         regs[sensor2Regs] = verificacaoDeNivel(sensor2);
          update_mb_slave(MB_SLAVE, regs, MB_REGS);
     }
+    regs[sensor2Regs] = verificacaoDeNivel(sensor2);
+    regs[bomba1Regs] = desligarBomba(bomba1);
+    update_mb_slave(MB_SLAVE, regs, MB_REGS);
+    while (regs[bomba2Regs] and !regs[sensor3Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)){
+         regs[bomba2Regs] = ligarBomba(bomba2);
+         regs[bomba1Regs] = desligarBomba(bomba1);
+         regs[bomba3Regs] = desligarBomba(bomba3);
+         regs[sensor3Regs] = verificacaoDeNivel(sensor3);
+         update_mb_slave(MB_SLAVE, regs, MB_REGS);
+    }
+    regs[sensor3Regs] = verificacaoDeNivel(sensor3);
+    regs[bomba2Regs] = desligarBomba(bomba2);
+    update_mb_slave(MB_SLAVE, regs, MB_REGS);
+    while (regs[bomba3Regs] and !regs[sensor1Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)){
+         regs[bomba3Regs] = ligarBomba(bomba3);
+         regs[bomba1Regs] = desligarBomba(bomba1);
+         regs[bomba2Regs] = desligarBomba(bomba2);
+         regs[sensor1Regs] = verificacaoDeNivel(sensor1);
+         update_mb_slave(MB_SLAVE, regs, MB_REGS);
+    }
+    regs[sensor1Regs] = verificacaoDeNivel(sensor1);
+    regs[bomba3Regs] = desligarBomba(bomba3);
+    update_mb_slave(MB_SLAVE, regs, MB_REGS);
 }
 
 void loop() {
-      
+
       switch (regs[modoOperacao]) { 
           case 1: { // Modo Automatico
             automatizar(sensor1Regs, sensor1, bomba3Regs, bomba3);
             automatizar(sensor2Regs, sensor2, bomba1Regs, bomba1);
-            automatizar(sensor3Regs, sensor3, bomba2Regs, bomba2);            
-            sensorInit = sensor1;
+            automatizar(sensor3Regs, sensor3, bomba2Regs, bomba2);
             break;
           }
-          default: {  // Modo Manual
-            manual(sensor2Regs, sensor2, bomba1Regs, bomba1);
-            manual(sensor3Regs, sensor3, bomba2Regs, bomba2);
-            manual(sensor1Regs, sensor1, bomba3Regs, bomba3);
+          case 0: {  // Modo Manual
+            manual();
             break;
           }
       }
 }
-
-/*
-void loop() {
-
-      regs[bomba1Regs] = desligarBomba(bomba1);
-      regs[bomba2Regs] = desligarBomba(bomba2);
-      regs[bomba3Regs] = desligarBomba(bomba3);
-      update_mb_slave(MB_SLAVE, regs, MB_REGS);
-      
-      switch (regs[modoOperacao]) { // Modo Automatico
-          case 1: {
-            digitalWrite(ledPin13, regs[modoOperacao]); /// Liga o Led 13, informando o modo automatico
-            regs[sensor1Regs] = verificacaoDeNivel(sensor1);
-            millisAnterior = millis();
-            while ((sensorInit == sensor1) and regs[modoOperacao] and !regs[sensor1Regs] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba3Regs] = ligarBomba(bomba3);
-              regs[bomba1Regs] = desligarBomba(bomba1);
-              regs[bomba2Regs] = desligarBomba(bomba2);
-              regs[sensor1Regs] = verificacaoDeNivel(sensor1);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            sensorInit++;
-            regs[sensor2Regs] = verificacaoDeNivel(sensor2);
-            millisAnterior = millis();
-            while ((sensorInit == sensor2) and regs[modoOperacao] and !regs[sensor2Regs] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba1Regs] = ligarBomba(bomba1);
-              regs[bomba2Regs] = desligarBomba(bomba2);
-              regs[bomba3Regs] = desligarBomba(bomba3);
-              regs[sensor2Regs] = verificacaoDeNivel(sensor2);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            sensorInit++;
-            regs[sensor3Regs] = verificacaoDeNivel(sensor3);
-            millisAnterior = millis();
-            while ((sensorInit == sensor3) and regs[modoOperacao] and !regs[sensor3Regs] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba2Regs] = ligarBomba(bomba2);
-              regs[bomba1Regs] = desligarBomba(bomba1);
-              regs[bomba3Regs] = desligarBomba(bomba3);
-              regs[sensor3Regs] = verificacaoDeNivel(sensor3);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            sensorInit = sensor1;
-            break;
-          }
-          default: {  // Modo Manual
-            digitalWrite(ledPin13, regs[modoOperacao]); // Desliga o Led 13, informando o modo manual
-            regs[sensor2Regs] = verificacaoDeNivel(sensor2);
-            millisAnterior = millis();
-            while (regs[bomba1Regs] and !regs[sensor2Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba1Regs] = ligarBomba(bomba1);
-              regs[bomba2Regs] = desligarBomba(bomba2);
-              regs[bomba3Regs] = desligarBomba(bomba3);
-              regs[sensor2Regs] = verificacaoDeNivel(sensor2);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            regs[sensor3Regs] = verificacaoDeNivel(sensor3);
-            millisAnterior = millis();
-            while (regs[bomba2Regs] and !regs[sensor3Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba1Regs] = desligarBomba(bomba1);
-              regs[bomba2Regs] = ligarBomba(bomba2);
-              regs[bomba3Regs] = desligarBomba(bomba3);
-              regs[sensor3Regs] = verificacaoDeNivel(sensor3);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            regs[sensor1Regs] = verificacaoDeNivel(sensor1);
-            millisAnterior = millis();
-            while (regs[bomba3Regs] and !regs[sensor1Regs] and !regs[modoOperacao] and tempoDeExecucao(millisAnterior)) {
-              regs[bomba1Regs] = desligarBomba(bomba1);
-              regs[bomba2Regs] = desligarBomba(bomba2);
-              regs[bomba3Regs] = ligarBomba(bomba3);
-              regs[sensor1Regs] = verificacaoDeNivel(sensor1);
-              update_mb_slave(MB_SLAVE, regs, MB_REGS);
-            }
-            break;
-          }
-      }
-}
-*/
 
